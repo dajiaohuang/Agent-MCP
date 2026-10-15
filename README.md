@@ -239,51 +239,34 @@ export PORT=8080                        # Python SSE and dashboard port
 #### Python Client
 ```python
 import asyncio
-from mcp import Client
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 async def main():
-    async with Client("http://localhost:8080/sse") as client:
-        # Create a backend agent
-        result = await client.call_tool("create_agent", {
-            "role": "backend",
-            "specialization": "API development"
-        })
-        
-        # Assign a task
-        await client.call_tool("assign_task", {
-            "agent_id": result["agent_id"],
-            "task": "Implement user authentication endpoints"
-        })
-        
-        # Query project context
-        context = await client.call_tool("ask_project_rag", {
-            "query": "What's our current database schema?"
-        })
-        print(context)
+    async with sse_client("http://localhost:8080/sse") as (read, write):
+        async with ClientSession(read, write) as client:
+            await client.initialize()
+            tools = await client.list_tools()
+            print([tool.name for tool in tools.tools])
 
 asyncio.run(main())
 ```
 
 #### JavaScript Client
 ```javascript
-import { MCPClient } from '@modelcontextprotocol/client';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
-const client = new MCPClient('http://localhost:8080/sse');
+const client = new Client({ name: 'agent-mcp-example', version: '1.0.0' });
 
-async function createAgent() {
-  await client.connect();
-  
-  const agent = await client.callTool('create_agent', {
-    role: 'frontend',
-    specialization: 'React components'
-  });
-  
-  console.log('Created agent:', agent.agent_id);
-  
-  await client.disconnect();
+async function listTools() {
+  await client.connect(new SSEClientTransport(new URL('http://localhost:8080/sse')));
+  const tools = await client.listTools();
+  console.log(tools.tools.map(tool => tool.name));
+  await client.close();
 }
 
-createAgent().catch(console.error);
+listTools().catch(console.error);
 ```
 
 ### Troubleshooting MCP Connection
